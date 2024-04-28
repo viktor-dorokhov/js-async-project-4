@@ -7,7 +7,6 @@ import { addLogger } from 'axios-debug-log';
 
 addLogger(axios);
 const appLogger = debug('page-loader');
-// const appLogger = console.log;
 
 const regIsHttps = /^https?:\/\//;
 
