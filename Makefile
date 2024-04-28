@@ -8,10 +8,19 @@ lint:
 	npx eslint .
 
 test:
-	npx jest
+	npm test
 
 test-coverage:
-	npx jest --coverage
+	npm test --coverage
+
+test-debug:
+	DEBUG=page-loader npm test
+
+test-debug-axios:
+	DEBUG=axios npm test
+
+test-debug-nock:
+	DEBUG=nock.* npm test
 
 page-loader:
 	node bin/pageLoader.js

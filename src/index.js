@@ -1,7 +1,13 @@
 import fs from 'fs/promises';
 import path from 'path';
-import axios, { AxiosError } from 'axios';
 import * as cheerio from 'cheerio';
+import axios, { AxiosError } from 'axios';
+import debug from 'debug';
+import { addLogger } from 'axios-debug-log';
+
+addLogger(axios);
+const appLogger = debug('page-loader');
+// const appLogger = console.log;
 
 const regIsHttps = /^https?:\/\//;
 
@@ -64,12 +70,14 @@ const loadPage = (mainUrl, outputLocationPath) => {
   let htmlContent;
   let fileData;
   // https://stackforgeeks.com/blog/nodejs-axios-download-file-stream-and-writefile
+  appLogger(`starting http request to ${mainUrl}`);
   return axios({
     method: 'get',
     url: mainUrl,
     responseType: 'arraybuffer',
   })
     .then((response) => {
+      appLogger(`http request to ${mainUrl} was completed`);
       fileData = Buffer.from(response.data, 'binary');
       htmlContent = cheerio.load(fileData);
       assetMapping.forEach(({ tag, attr, defaultExtName }) => {
@@ -88,20 +96,27 @@ const loadPage = (mainUrl, outputLocationPath) => {
         });
       });
     })
-    .then(() => fs.mkdir(assetsPath, { recursive: true }))
+    .then(() => (
+      fs.mkdir(assetsPath, { recursive: true }).then(() => (
+        appLogger(`directory ${assetsPath} was created`)
+      ))))
     .then(() => {
       const promises = [];
       assetList.forEach(({ assetUrl, assetPath }) => {
         try {
+          appLogger(`starting http request to ${assetUrl}`);
           promises.push(axios({
             method: 'get',
             url: assetUrl,
             responseType: 'arraybuffer',
           })
             .then((responseAsset) => {
+              appLogger(`http request to ${assetUrl} was completed`);
               const assetFileData = Buffer.from(responseAsset.data, 'binary');
               // console.log(`Tag: ${tag} Src: ${assetPath}`);
-              return fs.writeFile(assetPath, assetFileData);
+              return fs.writeFile(assetPath, assetFileData).then(() => (
+                appLogger(`file ${assetPath} was created`)
+              ));
             }))
             .catch(() => { /* */ });
         } catch (e) { /* */ }
@@ -109,11 +124,13 @@ const loadPage = (mainUrl, outputLocationPath) => {
       return promises;
     })
     .then((promises) => Promise.all(promises))
-    .then(() => fs.writeFile(filePath, htmlContent.html())) // fileData
+    .then(() => fs.writeFile(filePath, htmlContent.html()).then(() => (
+      appLogger(`file ${filePath} was created`)
+    ))) // fileData
     .then(() => filePath)
     .catch((err) => {
       if (err instanceof AxiosError) {
-        throw new Error(`Request of ${mainUrl} failed with status code: ${err.response.status}`);
+        throw new Error(`Request to ${mainUrl} failed with status code: ${err.response.status}`);
       }
       throw new Error(err.message);
     });

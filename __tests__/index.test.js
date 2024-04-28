@@ -112,7 +112,7 @@ test('wrong url', async () => {
     .get(urlPathNameWrong)
     .reply(404, null);
   await expect(loadPage(urlWrong, tempDir))
-    .rejects.toThrow(`Request of ${urlWrong} failed with status code: 404`);
+    .rejects.toThrow(`Request to ${urlWrong} failed with status code: 404`);
 });
 
 // TODO remove temp directories?
