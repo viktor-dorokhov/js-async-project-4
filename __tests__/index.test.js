@@ -5,6 +5,7 @@ import {
   sep,
   join,
   basename,
+  dirname,
 } from 'path';
 import fs from 'fs/promises';
 import { test, expect } from '@jest/globals';
@@ -16,44 +17,61 @@ import loadPage from '../src/index.js';
 // const __dirname = dirname(__filename);
 // const dirA = `${__dirname}${sep}..${sep}__fixtures__${sep}`;
 const dirR = `__fixtures__${sep}`;
+
+const getFixturePath = (filename) => resolve(`${dirR}${filename}`);
+
 const urlOrigin = 'https://ru.hexlet.io';
 const urlPathName = '/courses';
 const urlPathNameWrong = '/wrong';
 const url = `${urlOrigin}${urlPathName}`;
 const urlWrong = `${urlOrigin}${urlPathNameWrong}`;
+const pathAssets = '/ru-hexlet-io-courses_files/';
+const fileNameImg = 'ru-hexlet-io-assets-professions-nodejs.png';
+const pathAssetsImg = `${pathAssets}${fileNameImg}`;
+const urlPathNameImg = '/assets/professions/nodejs.png';
 const expectedFileName = 'ru-hexlet-io-courses.html';
 
+const fixturePathImg = getFixturePath(pathAssetsImg);
+
+console.log(urlPathNameImg);
+console.log(fixturePathImg);
+
+let originHtml;
 let expectedHtml;
 let tempDir;
-
-const getFixturePath = (filename) => resolve(`${dirR}${filename}`);
 
 nock.disableNetConnect();
 
 beforeAll(async () => {
   expectedHtml = await fs.readFile(getFixturePath('expected.html'), 'utf-8');
+  originHtml = await fs.readFile(getFixturePath('origin.html'), 'utf-8');
 });
 
 beforeEach(async () => {
   tempDir = await fs.mkdtemp(join(os.tmpdir(), 'page-loader-'));
   nock(urlOrigin)
     .get(urlPathName)
-    .reply(200, expectedHtml);
+    .reply(200, originHtml)
+    .get(urlPathNameImg)
+    .replyWithFile(200, fixturePathImg);
 });
 
-test('check file name', async () => {
+test('root html file', async () => {
   const filePath = await loadPage(url, tempDir);
+  const content = await fs.readFile(filePath, 'utf-8');
+  expect(content).toEqual(expectedHtml);
   const fileName = basename(filePath);
   expect(fileName).toEqual(expectedFileName);
 });
 
-test('check file content', async () => {
+test('image', async () => {
   const filePath = await loadPage(url, tempDir);
-  const content = await fs.readFile(filePath, 'utf-8');
-  expect(content).toEqual(expectedHtml);
+  const dirPath = dirname(filePath);
+  const stat = await fs.stat(resolve(`${dirPath}${pathAssetsImg}`));
+  expect(stat.isFile()).toBe(true);
 });
 
-test('check wrong url', async () => {
+test('wrong url', async () => {
   nock(urlOrigin)
     .get(urlPathNameWrong)
     .reply(404, null);
