@@ -27,14 +27,23 @@ const url = `${urlOrigin}${urlPathName}`;
 const urlWrong = `${urlOrigin}${urlPathNameWrong}`;
 const pathAssets = '/ru-hexlet-io-courses_files/';
 const fileNameImg = 'ru-hexlet-io-assets-professions-nodejs.png';
+const fileNameLink = 'ru-hexlet-io-assets-application.css';
+const fileNameScript = 'ru-hexlet-io-packs-js-runtime.js';
+const fileNameHtml = 'ru-hexlet-io-courses.html';
 const pathAssetsImg = `${pathAssets}${fileNameImg}`;
+const pathAssetsLink = `${pathAssets}${fileNameLink}`;
+const pathAssetsScript = `${pathAssets}${fileNameScript}`;
+const pathAssetsHtml = `${pathAssets}${fileNameHtml}`;
 const urlPathNameImg = '/assets/professions/nodejs.png';
+const urlPathNameLink = '/assets/application.css';
+const urlPathNameScript = '/packs/js/runtime.js';
+const urlPathNameHtml = '/courses';
 const expectedFileName = 'ru-hexlet-io-courses.html';
 
 const fixturePathImg = getFixturePath(pathAssetsImg);
-
-console.log(urlPathNameImg);
-console.log(fixturePathImg);
+const fixturePathLink = getFixturePath(pathAssetsLink);
+const fixturePathScript = getFixturePath(pathAssetsScript);
+const fixturePathHtml = getFixturePath(pathAssetsHtml);
 
 let originHtml;
 let expectedHtml;
@@ -53,7 +62,13 @@ beforeEach(async () => {
     .get(urlPathName)
     .reply(200, originHtml)
     .get(urlPathNameImg)
-    .replyWithFile(200, fixturePathImg);
+    .replyWithFile(200, fixturePathImg)
+    .get(urlPathNameLink)
+    .replyWithFile(200, fixturePathLink)
+    .get(urlPathNameScript)
+    .replyWithFile(200, fixturePathScript)
+    .get(urlPathNameHtml)
+    .replyWithFile(200, fixturePathHtml);
 });
 
 test('root html file', async () => {
@@ -64,10 +79,31 @@ test('root html file', async () => {
   expect(fileName).toEqual(expectedFileName);
 });
 
-test('image', async () => {
+test('asset image', async () => {
   const filePath = await loadPage(url, tempDir);
   const dirPath = dirname(filePath);
   const stat = await fs.stat(resolve(`${dirPath}${pathAssetsImg}`));
+  expect(stat.isFile()).toBe(true);
+});
+
+test('asset link', async () => {
+  const filePath = await loadPage(url, tempDir);
+  const dirPath = dirname(filePath);
+  const stat = await fs.stat(resolve(`${dirPath}${pathAssetsLink}`));
+  expect(stat.isFile()).toBe(true);
+});
+
+test('asset script', async () => {
+  const filePath = await loadPage(url, tempDir);
+  const dirPath = dirname(filePath);
+  const stat = await fs.stat(resolve(`${dirPath}${pathAssetsScript}`));
+  expect(stat.isFile()).toBe(true);
+});
+
+test('asset html', async () => {
+  const filePath = await loadPage(url, tempDir);
+  const dirPath = dirname(filePath);
+  const stat = await fs.stat(resolve(`${dirPath}${pathAssetsHtml}`));
   expect(stat.isFile()).toBe(true);
 });
 

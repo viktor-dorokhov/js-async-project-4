@@ -10,9 +10,9 @@ const getMainFileName = (url) => {
   return `${convertedUrl}.html`;
 };
 
-const getExtName = (url) => {
+const getExtName = (url, defaultExtName = '') => {
   const pathname = regIsHttps.test(url) ? (new URL(url)).pathname : url;
-  return path.extname(pathname);
+  return path.extname(pathname) || defaultExtName;
 };
 
 const getNormalizedAssetUrl = (assetUrl, mainUrl) => {
@@ -22,28 +22,22 @@ const getNormalizedAssetUrl = (assetUrl, mainUrl) => {
   return String(new URL(assetUrl, mainUrl));
 };
 
-const getAssetFileName = (assetUrl) => {
-  // const pathname = regIsHttps.test(assetUrl) ? (new URL(assetUrl)).pathname: assetUrl;
+const getAssetFileName = (assetUrl, defaultExtName) => {
   const { pathname } = new URL(assetUrl);
   const extname = getExtName(pathname);
   const convertedAssetUrl = assetUrl
     .replace(regIsHttps, '')
     .replace(/^\//, '')
-    .slice(0, -extname.length)
+    .slice(0, extname ? -extname.length : undefined)
     .replace(/\W/g, '-')
-    .concat(extname);
-  /* if (!regIsHttps.test(assetUrl)) {
-    const mainUrlObject = new URL(mainUrl);
-    return `${mainUrlObject.hostname.replace(/\W/g, '-')}-${convertedAssetUrl}`;
-  } */
+    .concat(extname || defaultExtName);
   return convertedAssetUrl;
 };
 
-const getMainDomain = (url) => {
+const geHostName = (url) => {
   try {
     const { hostname } = new URL(url);
-    const domains = hostname.split('.');
-    return domains.slice(-2).join('.');
+    return hostname;
   } catch (e) {
     return null;
   }
@@ -51,13 +45,13 @@ const getMainDomain = (url) => {
 
 const isLocalAssetUrl = (assetUrl, mainUrl) => (
   assetUrl
-    && (!regIsHttps.test(assetUrl) || getMainDomain(assetUrl) === getMainDomain(mainUrl))
+    && (!regIsHttps.test(assetUrl) || geHostName(assetUrl) === geHostName(mainUrl))
 );
 
 const assetMapping = [
-  { tag: 'img', attr: 'src' },
-  // { tag: 'link', attr: 'href' },
-  // { tag: 'script', attr: 'src' },
+  { tag: 'img', attr: 'src', defaultExtName: '' },
+  { tag: 'link', attr: 'href', defaultExtName: '.html' },
+  { tag: 'script', attr: 'src', defaultExtName: '.js' },
 ];
 
 const loadPage = (mainUrl, outputLocationPath) => {
@@ -78,14 +72,14 @@ const loadPage = (mainUrl, outputLocationPath) => {
     .then((response) => {
       fileData = Buffer.from(response.data, 'binary');
       htmlContent = cheerio.load(fileData);
-      assetMapping.forEach(({ tag, attr }) => {
+      assetMapping.forEach(({ tag, attr, defaultExtName }) => {
         const assets = htmlContent(tag);
         assets.each((_index, element) => {
           const assetAttrValue = htmlContent(element).attr(attr);
-          // пока без расширения не работаем
-          if (isLocalAssetUrl(assetAttrValue, mainUrl) && getExtName(assetAttrValue)) {
+          if (isLocalAssetUrl(assetAttrValue, mainUrl)
+            && getExtName(assetAttrValue, defaultExtName)) {
             const assetUrl = getNormalizedAssetUrl(assetAttrValue, mainUrl);
-            const assetFileName = getAssetFileName(assetUrl);
+            const assetFileName = getAssetFileName(assetUrl, defaultExtName);
             const assetPath = path.join(assetsPath, assetFileName);
             const localPath = path.join(assetsDirName, assetFileName);
             assetList.push({ tag, assetUrl, assetPath });
