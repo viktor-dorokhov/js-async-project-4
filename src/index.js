@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import * as cheerio from 'cheerio';
+import Listr from 'listr';
 import axios from 'axios';
 import debug from 'debug';
 import { addLogger } from 'axios-debug-log';
@@ -96,8 +97,11 @@ const loadPage = (mainUrl, outputLocationPath) => {
       });
     })
     .catch((err) => {
-      if (err.response.status !== 200) {
-        throw new Error(`Request to ${mainUrl} failed with status code ${err.response.status}`);
+      const status = err.response?.status;
+      if (status !== 200) {
+        appLogger(`Logger: http request to ${mainUrl} was failed`);
+        const mainErrorMessage = `Request to ${mainUrl} failed`;
+        throw new Error(`${mainErrorMessage}${status ? ` with status code ${status}` : ''}`);
       }
     })
     .then(() => (
@@ -108,31 +112,39 @@ const loadPage = (mainUrl, outputLocationPath) => {
         throw new Error(`Unable to create directory ${assetsPath}`);
       })))
     .then(() => {
-      const promises = [];
+      // const promises = [];
+      const tasks = [];
       assetList.forEach(({ assetUrl, assetPath }) => {
-        try {
-          appLogger(`Logger: starting http request to ${assetUrl}`);
-          promises.push(axios({
-            method: 'get',
-            url: assetUrl,
-            responseType: 'arraybuffer',
-          })
-            .then((responseAsset) => {
-              appLogger(`Logger: http request to ${assetUrl} was completed`);
-              const assetFileData = Buffer.from(responseAsset.data, 'binary');
-              return fs.writeFile(assetPath, assetFileData).then(() => (
-                appLogger(`Logger: file ${assetPath} was created`)
-              ));
-            }))
-            .catch(() => { /* */ });
-        } catch (err) { /* */ }
+        const promiseAsset = axios({
+          method: 'get',
+          url: assetUrl,
+          responseType: 'arraybuffer',
+        })
+          .then((responseAsset) => {
+            const assetFileData = Buffer.from(responseAsset.data, 'binary');
+            return fs.writeFile(assetPath, assetFileData).then(() => (
+              appLogger(`Logger: file ${assetPath} was created`)
+            ));
+          });
+        // promises.push(promiseAsset)
+        tasks.push({
+          title: assetUrl,
+          task: () => promiseAsset,
+        });
       });
-      return promises;
+      // return promises;
+      return new Listr(tasks, { concurrent: true, exitOnError: false });
     })
-    .then((promises) => Promise.all(promises))
+    .then((listr) => listr.run())
+    .catch((err) => {
+      if (err.constructor.name !== 'ListrError') { // ignore Listr errors to prevent app crash
+        throw new Error(err.message);
+      }
+    })
+    // .then((promises) => Promise.all(promises))
     .then(() => fs.writeFile(filePath, htmlContent.html()).then(() => (
       appLogger(`Logger: file ${filePath} was created`)
-    ))) // fileData
+    )))
     .then(() => filePath);
 };
 
