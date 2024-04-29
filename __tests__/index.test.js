@@ -1,8 +1,6 @@
 // import { fileURLToPath } from 'url';
 import {
   resolve,
-  // dirname,
-  sep,
   join,
   basename,
   dirname,
@@ -13,11 +11,7 @@ import nock from 'nock';
 import os from 'os';
 import loadPage from '../src/index.js';
 
-// const __filename = fileURLToPath(import.meta.url);
-// const __dirname = dirname(__filename);
-// const dirA = `${__dirname}${sep}..${sep}__fixtures__${sep}`;
-const dirR = `__fixtures__${sep}`;
-
+const dirR = '__fixtures__/';
 const getFixturePath = (filename) => resolve(`${dirR}${filename}`);
 
 const urlOrigin = 'https://ru.hexlet.io';
@@ -121,5 +115,6 @@ test('wrong directory', async () => {
     .rejects.toThrow(`Unable to create directory ${wrongDir}`);
 });
 
-// TODO remove temp directories?
+// remove temp directories
+// cd /tmp
 // rm -rf $(find . -type d -name 'page-loader-*')

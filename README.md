@@ -37,7 +37,7 @@ page-loader [опции] аргументы
 
 ## Примеры:
 
-### Скачивание в текущую директорию:
+### Скачивание в текущую директорию
 ```
 page-loader https://ru.hexlet.io/courses
 ```
@@ -47,6 +47,29 @@ page-loader https://ru.hexlet.io/courses
 page-loader https://ru.hexlet.io/courses -o /var/tmp
 ```
 
-## Демо:
+## Демо
 
-[![asciicast](https://asciinema.org/a/656703.svg)](https://asciinema.org/a/656703)
+Показаны успешные скачивания страниц, а также обработка ошибочных ситуаций
+
+[![asciicast](https://asciinema.org/a/656876.svg)](https://asciinema.org/a/656876)
+
+## Логирование
+
+### Логирование приложения
+```
+make test-debug
+```
+
+### Логирование axios
+```
+make test-debug-axios
+```
+
+### Логирование nock
+```
+make test-debug-nock
+```
+
+Демонстрация команд для логирования
+
+[![asciicast](https://asciinema.org/a/656877.svg)](https://asciinema.org/a/656877)

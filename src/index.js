@@ -21,6 +21,8 @@ const getExtName = (url, defaultExtName = '') => {
   return path.extname(pathname) || defaultExtName;
 };
 
+const isDataAttr = (value) => value.startsWith('data:');
+
 const getNormalizedAssetUrl = (assetUrl, mainUrl) => {
   if (regIsHttps.test(assetUrl)) {
     return assetUrl;
@@ -85,7 +87,8 @@ const loadPage = (mainUrl, outputLocationPath) => {
         assets.each((_index, element) => {
           const assetAttrValue = htmlContent(element).attr(attr);
           if (isLocalAssetUrl(assetAttrValue, mainUrl)
-            && getExtName(assetAttrValue, defaultExtName)) {
+            && getExtName(assetAttrValue, defaultExtName)
+            && !isDataAttr(assetAttrValue)) {
             const assetUrl = getNormalizedAssetUrl(assetAttrValue, mainUrl);
             const assetFileName = getAssetFileName(assetUrl, defaultExtName);
             const assetPath = path.join(assetsPath, assetFileName);
