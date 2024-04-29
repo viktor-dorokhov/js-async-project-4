@@ -62,7 +62,7 @@ const assetMapping = [
   { tag: 'script', attr: 'src', defaultExtName: '.js' },
 ];
 
-const loadPage = (mainUrl, outputLocationPath) => {
+const loadPage = (mainUrl, outputLocationPath = process.cwd()) => {
   const htmlFileName = getMainFileName(mainUrl);
 
   const filePath = path.join(outputLocationPath, htmlFileName);
