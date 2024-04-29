@@ -23,6 +23,7 @@ const getFixturePath = (filename) => resolve(`${dirR}${filename}`);
 const urlOrigin = 'https://ru.hexlet.io';
 const urlPathName = '/courses';
 const urlPathNameWrong = '/wrong';
+const wrongDir = '/temp1';
 const url = `${urlOrigin}${urlPathName}`;
 const urlWrong = `${urlOrigin}${urlPathNameWrong}`;
 const pathAssets = '/ru-hexlet-io-courses_files/';
@@ -112,7 +113,12 @@ test('wrong url', async () => {
     .get(urlPathNameWrong)
     .reply(404, null);
   await expect(loadPage(urlWrong, tempDir))
-    .rejects.toThrow(`Request to ${urlWrong} failed with status code: 404`);
+    .rejects.toThrow(`Request to ${urlWrong} failed with status code 404`);
+});
+
+test('wrong directory', async () => {
+  await expect(loadPage(url, wrongDir))
+    .rejects.toThrow(`Unable to create directory ${wrongDir}`);
 });
 
 // TODO remove temp directories?

@@ -14,17 +14,12 @@ program
   .option('-o, --output <dir>', 'output dir', currentDir)
   .arguments('<url>')
   .action((url, { output }) => {
-    // const result = loadPage(url, output);
     loadPage(url, output).then((filepath) => {
       console.log(filepath);
     }).catch((err) => {
-      console.log(err.message);
-      // console.log('Page loader failure!');
-      process.exit();
+      console.error(`An error has occurred: ${err.message}`);
+      process.exit(1);
     });
-    /* if (result) {
-      console.log(result);
-    } */
   });
 
 program.parse();

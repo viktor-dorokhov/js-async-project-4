@@ -11,7 +11,7 @@ test:
 	npm test
 
 test-coverage:
-	npm test --coverage
+	npm test -- --coverage
 
 test-debug:
 	DEBUG=page-loader npm test
