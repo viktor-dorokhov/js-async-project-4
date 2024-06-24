@@ -12,17 +12,6 @@ const appLogger = debug('page-loader');
 const regIsHttps = /^https?:\/\//;
 
 const getMainFileName = (url) => {
-  // не вижу, что в данном случае дает path.parse, код только усложнится
-  // console.log(path.parse('https://ru.hexlet.io/courses'));
-  /*
-  {
-    root: '',
-    dir: 'https://ru.hexlet.io',
-    base: 'courses',
-    ext: '',
-    name: 'courses'
-  }
-  */
   const convertedUrl = url.trim().replace(regIsHttps, '').replace(/\/$/, '').replace(/\W/g, '-');
   return `${convertedUrl}.html`;
 };
@@ -73,31 +62,16 @@ const assetMapping = [
   { tag: 'script', attr: 'src', defaultExtName: '.js' },
 ];
 
-const getLocalAssetPromise = (assetUrl, assetPath) => {
-  appLogger(`Logger: starting http request to ${assetUrl} for local asset`);
-  const promiseAsset = axios({
-    method: 'get',
-    url: assetUrl,
-    responseType: 'arraybuffer',
-  })
-    .then((responseAsset) => {
-      const assetFileData = Buffer.from(responseAsset.data, 'binary');
-      return fs.writeFile(assetPath, assetFileData);
-    });
-
-  return promiseAsset;
-};
-
 const loadPage = (mainUrl, outputLocationPath = process.cwd()) => {
   const htmlFileName = getMainFileName(mainUrl);
+
   const filePath = path.join(outputLocationPath, htmlFileName);
   const assetsDirName = `${path.parse(htmlFileName).name}_files`;
   const assetsPath = path.resolve(path.join(outputLocationPath, assetsDirName));
   const assetList = [];
-  // я бы все-таки оставил переменную
-  // иначе ее придется пробрасывать через все
-  // или несколько пайпов (если создание файла сделать, например, после создания директории)
   let htmlContent;
+  let fileData;
+  // https://stackforgeeks.com/blog/nodejs-axios-download-file-stream-and-writefile
   appLogger(`Logger: starting http request to ${mainUrl}`);
   return axios({
     method: 'get',
@@ -105,8 +79,8 @@ const loadPage = (mainUrl, outputLocationPath = process.cwd()) => {
     responseType: 'arraybuffer',
   })
     .then((response) => {
-      appLogger('Logger: extracting links from root HTML file');
-      const fileData = Buffer.from(response.data, 'binary');
+      appLogger(`Logger: http request to ${mainUrl} was completed`);
+      fileData = Buffer.from(response.data, 'binary');
       htmlContent = cheerio.load(fileData);
       assetMapping.forEach(({ tag, attr, defaultExtName }) => {
         const assets = htmlContent(tag);
@@ -125,32 +99,56 @@ const loadPage = (mainUrl, outputLocationPath = process.cwd()) => {
         });
       });
     })
-    .then(() => {
-      appLogger(`Logger: creating directory ${assetsPath}`);
-      return fs.mkdir(assetsPath, { recursive: true });
+    .catch((err) => {
+      const status = err.response?.status;
+      if (status !== 200) {
+        appLogger(`Logger: http request to ${mainUrl} was failed`);
+        const mainErrorMessage = `Request to ${mainUrl} failed`;
+        throw new Error(`${mainErrorMessage}${status ? ` with status code ${status}` : ''}`);
+      }
     })
+    .then(() => (
+      fs.mkdir(assetsPath, { recursive: true }).then(() => (
+        appLogger(`Logger: directory ${assetsPath} was created`)
+      )).catch(() => {
+        appLogger(`Logger: directory ${assetsPath} was not created`);
+        throw new Error(`Unable to create directory ${assetsPath}`);
+      })))
     .then(() => {
-      appLogger('Logger: downloading local assets');
-      const tasks = assetList.map(({ assetUrl, assetPath }) => (
-        {
+      // const promises = [];
+      const tasks = [];
+      assetList.forEach(({ assetUrl, assetPath }) => {
+        const promiseAsset = axios({
+          method: 'get',
+          url: assetUrl,
+          responseType: 'arraybuffer',
+        })
+          .then((responseAsset) => {
+            const assetFileData = Buffer.from(responseAsset.data, 'binary');
+            return fs.writeFile(assetPath, assetFileData).then(() => (
+              appLogger(`Logger: file ${assetPath} was created`)
+            ));
+          });
+        // promises.push(promiseAsset)
+        tasks.push({
           title: assetUrl,
-          task: () => getLocalAssetPromise(assetUrl, assetPath),
-        }
-      ));
+          task: () => promiseAsset,
+        });
+      });
+      // return promises;
       return new Listr(tasks, { concurrent: true, exitOnError: false });
     })
     .then((listr) => listr.run())
     .catch((err) => {
-      // ignore Listr errors to prevent app crash
-      if (err.constructor.name !== 'ListrError') {
-        throw err;
+      if (err.constructor.name !== 'ListrError') { // ignore Listr errors to prevent app crash
+        throw new Error(err.message);
       }
     })
-    .then(() => {
-      appLogger(`Logger: creating file ${filePath}`);
-      fs.writeFile(filePath, htmlContent.html());
-      return filePath;
-    });
+    // .then((promises) => Promise.all(promises))
+    .then(() => fs.writeFile(filePath, htmlContent.html()).then(() => (
+      appLogger(`Logger: file ${filePath} was created`)
+    )))
+    .then(() => filePath);
 };
 
 export default loadPage;
