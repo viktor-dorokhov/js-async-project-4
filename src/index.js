@@ -1,4 +1,5 @@
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import * as cheerio from 'cheerio';
 import Listr from 'listr';
@@ -12,6 +13,17 @@ const appLogger = debug('page-loader');
 const regIsHttps = /^https?:\/\//;
 
 const getMainFileName = (url) => {
+  // не вижу, что в данном случае дает path.parse, код только усложнится
+  // console.log(path.parse('https://ru.hexlet.io/courses'));
+  /*
+  {
+    root: '',
+    dir: 'https://ru.hexlet.io',
+    base: 'courses',
+    ext: '',
+    name: 'courses'
+  }
+  */
   const convertedUrl = url.trim().replace(regIsHttps, '').replace(/\/$/, '').replace(/\W/g, '-');
   return `${convertedUrl}.html`;
 };
@@ -62,16 +74,33 @@ const assetMapping = [
   { tag: 'script', attr: 'src', defaultExtName: '.js' },
 ];
 
-const loadPage = (mainUrl, outputLocationPath = process.cwd()) => {
-  const htmlFileName = getMainFileName(mainUrl);
+const getLocalAssetPromise = (assetUrl, assetPath) => {
+  appLogger(`Logger: starting http request to ${assetUrl} for local asset`);
+  const promiseAsset = axios({
+    method: 'get',
+    url: assetUrl,
+    responseType: 'arraybuffer',
+  })
+    .then((responseAsset) => {
+      const assetFileData = Buffer.from(responseAsset.data, 'binary');
+      return fs.writeFile(assetPath, assetFileData);
+    });
 
+  return promiseAsset;
+};
+
+const loadPage = (mainUrl, outputLocationPath = process.cwd()) => {
+  if (!fsSync.existsSync(outputLocationPath)) {
+    // добавлено, чтобы пройти новые автотесты
+    // но раньше в конце апреля такого требования не было
+    // директория создавалась в fs.writeFile, если были на это права
+    return Promise.reject(new Error(`Directory ${outputLocationPath} is not exists`));
+  }
+  const htmlFileName = getMainFileName(mainUrl);
   const filePath = path.join(outputLocationPath, htmlFileName);
   const assetsDirName = `${path.parse(htmlFileName).name}_files`;
   const assetsPath = path.resolve(path.join(outputLocationPath, assetsDirName));
   const assetList = [];
-  let htmlContent;
-  let fileData;
-  // https://stackforgeeks.com/blog/nodejs-axios-download-file-stream-and-writefile
   appLogger(`Logger: starting http request to ${mainUrl}`);
   return axios({
     method: 'get',
@@ -79,9 +108,9 @@ const loadPage = (mainUrl, outputLocationPath = process.cwd()) => {
     responseType: 'arraybuffer',
   })
     .then((response) => {
-      appLogger(`Logger: http request to ${mainUrl} was completed`);
-      fileData = Buffer.from(response.data, 'binary');
-      htmlContent = cheerio.load(fileData);
+      appLogger('Logger: extracting links from root HTML file');
+      const fileData = Buffer.from(response.data, 'binary');
+      const htmlContent = cheerio.load(fileData);
       assetMapping.forEach(({ tag, attr, defaultExtName }) => {
         const assets = htmlContent(tag);
         assets.each((_index, element) => {
@@ -98,56 +127,33 @@ const loadPage = (mainUrl, outputLocationPath = process.cwd()) => {
           }
         });
       });
+      return htmlContent;
     })
-    .catch((err) => {
-      const status = err.response?.status;
-      if (status !== 200) {
-        appLogger(`Logger: http request to ${mainUrl} was failed`);
-        const mainErrorMessage = `Request to ${mainUrl} failed`;
-        throw new Error(`${mainErrorMessage}${status ? ` with status code ${status}` : ''}`);
-      }
+    .then((htmlContent) => {
+      appLogger(`Logger: creating file ${filePath}`);
+      return fs.writeFile(filePath, htmlContent.html());
     })
-    .then(() => (
-      fs.mkdir(assetsPath, { recursive: true }).then(() => (
-        appLogger(`Logger: directory ${assetsPath} was created`)
-      )).catch(() => {
-        appLogger(`Logger: directory ${assetsPath} was not created`);
-        throw new Error(`Unable to create directory ${assetsPath}`);
-      })))
     .then(() => {
-      // const promises = [];
-      const tasks = [];
-      assetList.forEach(({ assetUrl, assetPath }) => {
-        const promiseAsset = axios({
-          method: 'get',
-          url: assetUrl,
-          responseType: 'arraybuffer',
-        })
-          .then((responseAsset) => {
-            const assetFileData = Buffer.from(responseAsset.data, 'binary');
-            return fs.writeFile(assetPath, assetFileData).then(() => (
-              appLogger(`Logger: file ${assetPath} was created`)
-            ));
-          });
-        // promises.push(promiseAsset)
-        tasks.push({
+      appLogger(`Logger: creating directory ${assetsPath}`);
+      return fs.mkdir(assetsPath, { recursive: true });
+    })
+    .then(() => {
+      appLogger('Logger: downloading local assets');
+      const tasks = assetList.map(({ assetUrl, assetPath }) => (
+        {
           title: assetUrl,
-          task: () => promiseAsset,
-        });
-      });
-      // return promises;
+          task: () => getLocalAssetPromise(assetUrl, assetPath),
+        }
+      ));
       return new Listr(tasks, { concurrent: true, exitOnError: false });
     })
     .then((listr) => listr.run())
     .catch((err) => {
-      if (err.constructor.name !== 'ListrError') { // ignore Listr errors to prevent app crash
-        throw new Error(err.message);
+      // ignore Listr errors to prevent app crash
+      if (err.constructor.name !== 'ListrError') {
+        throw err;
       }
     })
-    // .then((promises) => Promise.all(promises))
-    .then(() => fs.writeFile(filePath, htmlContent.html()).then(() => (
-      appLogger(`Logger: file ${filePath} was created`)
-    )))
     .then(() => filePath);
 };
 
